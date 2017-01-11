@@ -16,11 +16,46 @@ import com.test.stock.util.FormatUtil;
  *
  */
 public class StockTest2 {
+
+	public static double bugAndSellScore = 2500;
+
+	public static double holdMoney = 700000;// 持有金额
+	public static int holdSum = 200;// 持有股票
+	public static double stockValue = 0;// 市值
+
 	public static void main(String[] args) {
 		try {
 			new StockTest2().getTrendPoint();
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+	}
+
+	public void action100Stock(double index_now, int num) {
+		if (num == 0) {
+			return;
+		}
+		if (num > 0) {
+			double spendMoney = index_now * num;
+			if (spendMoney > holdMoney) {
+				System.out.println("所剩余额不足，不能买入");
+				return;
+			}
+			holdMoney -= spendMoney;
+			holdSum += num;
+			System.out.println("买入成功，买入" + num + "股，" + "花费" + spendMoney
+					+ "，剩余金额" + holdMoney + "，持有股票数量" + holdSum);
+		} else {
+			num = num * -1;
+			if (num > holdSum) {
+				System.out.println("所剩股票数量不足，不能卖出");
+				return;
+			}
+			double incomeMoney = index_now * num;
+			holdMoney += incomeMoney;
+			holdSum -= num;
+			System.out.println("卖出成功，卖出" + num + "股，" + "收入" + incomeMoney
+					+ "，剩余金额" + holdMoney + "，持有股票数量" + holdSum);
 		}
 	}
 
@@ -47,10 +82,41 @@ public class StockTest2 {
 
 			double buyScore = volumePointFor30 * buyPoint;
 			double sellScore = volumePointFor30 * sellPoint;
-			System.out.println(indexMinuteEntity.mTimeStr + ",买入分："
-					+ FormatUtil.formatDouble2(buyScore) + "，卖出分：" + FormatUtil.formatDouble2(sellScore));
+
+			showResult(indexMinuteEntity, buyScore, sellScore);
 		}
 
+	}
+
+	public void showResult(IndexMinuteEntity indexMinuteEntity,
+			double buyScore, double sellScore) {
+
+		stockValue = holdMoney + indexMinuteEntity.mIndex_now * holdSum;
+		if (buyScore > bugAndSellScore) {
+			System.out.println(indexMinuteEntity.mTimeStr + ",当前指数："
+					+ indexMinuteEntity.mIndex_now + ",买分："
+					+ FormatUtil.formatDouble2(buyScore) + "，卖分："
+					+ FormatUtil.formatDouble2(sellScore));
+			System.out.println("符合买入指标，尝试买入100股");
+			action100Stock(indexMinuteEntity.mIndex_now, 100);
+			System.out.println("目前市值：" + FormatUtil.formatDouble2(stockValue));
+		} else if (sellScore > bugAndSellScore) {
+
+			System.out.println(indexMinuteEntity.mTimeStr + ",当前指数："
+					+ indexMinuteEntity.mIndex_now + ",买分："
+					+ FormatUtil.formatDouble2(buyScore) + "，卖分："
+					+ FormatUtil.formatDouble2(sellScore));
+
+			System.out.println("符合卖出指标，尝试卖出100股");
+			action100Stock(indexMinuteEntity.mIndex_now, -100);
+			System.out.println("目前市值：" + FormatUtil.formatDouble2(stockValue));
+		} else {
+//			System.out.println(indexMinuteEntity.mTimeStr + ",当前指数："
+//					+ indexMinuteEntity.mIndex_now + ",买分："
+//					+ FormatUtil.formatDouble2(buyScore) + "，卖分："
+//					+ FormatUtil.formatDouble2(sellScore) + "____不操作");
+		}
+		
 	}
 
 	/**
@@ -72,13 +138,13 @@ public class StockTest2 {
 		List<IndexMinuteEntity> list = getSubList(inputlist,
 				inputlist.size() - 15, inputlist.size() - 1);
 
-		boolean direction = list.get(list.size() - 1).mIndex_now
+		boolean direction = list.get(list.size() - 3).mIndex_now
 				- list.get(0).mIndex_now > 0;// true为向上，false为向下
 
 		double weight1 = getIndexPointWeightFor1(list)[1] * 40 / 100;
 		double weight2 = getIndexPointWeightFor3(list)[1] * 30 / 100;
 		double weight3 = getIndexPointWeightFor15(list)[1] * 30 / 100;
-		
+
 		double along = weight1 + weight2 + weight3;// 逆势
 
 		weight1 = getIndexPointWeightFor1(list)[0] * 40 / 100;

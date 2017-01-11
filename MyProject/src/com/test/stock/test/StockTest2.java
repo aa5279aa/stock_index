@@ -10,7 +10,8 @@ import com.test.stock.util.FormatUtil;
 /**
  * double[0]顺势 double[1]逆势
  * 
- * 加入买入卖出指标
+ * 加入买入卖出指标 point[0]买入 point[1]卖出
+ * 
  * @author xiangleiliu
  *
  */
@@ -40,11 +41,59 @@ public class StockTest2 {
 				continue;
 			}
 			double volumePointFor30 = getVolumePointFor30(list);// 53
-			double indexPoint = getIndexPoint(list);
-			double score = volumePointFor30 * indexPoint;
-			System.out.println(indexMinuteEntity.mTimeStr + ",得分：" + FormatUtil.formatDouble2(score));
+			double[] indexPoint = getIndexPoint(list);
+			double buyPoint = indexPoint[0];
+			double sellPoint = indexPoint[1];
+
+			double buyScore = volumePointFor30 * buyPoint;
+			double sellScore = volumePointFor30 * sellPoint;
+			System.out.println(indexMinuteEntity.mTimeStr + ",买入分："
+					+ FormatUtil.formatDouble2(buyScore) + "，卖出分：" + FormatUtil.formatDouble2(sellScore));
 		}
 
+	}
+
+	/**
+	 * 返回两种指数，分为指 买入指数 和 卖出指数
+	 * 
+	 * @param inputlist
+	 * @return
+	 * @throws Exception
+	 */
+	public double[] getIndexPoint(List<IndexMinuteEntity> inputlist)
+			throws Exception {
+		double[] points = new double[2];
+		if (inputlist.size() <= 15) {
+			points[0] = 10.0;
+			points[1] = 10.0;
+			return points;
+		}
+
+		List<IndexMinuteEntity> list = getSubList(inputlist,
+				inputlist.size() - 15, inputlist.size() - 1);
+
+		boolean direction = list.get(list.size() - 1).mIndex_now
+				- list.get(0).mIndex_now > 0;// true为向上，false为向下
+
+		double weight1 = getIndexPointWeightFor1(list)[1] * 40 / 100;
+		double weight2 = getIndexPointWeightFor3(list)[1] * 30 / 100;
+		double weight3 = getIndexPointWeightFor15(list)[1] * 30 / 100;
+		
+		double along = weight1 + weight2 + weight3;// 逆势
+
+		weight1 = getIndexPointWeightFor1(list)[0] * 40 / 100;
+		weight2 = getIndexPointWeightFor3(list)[0] * 30 / 100;
+		weight3 = getIndexPointWeightFor15(list)[0] * 30 / 100;
+		double inverse = (weight1 + weight2 + weight3) * 0.8;// 顺势.顺势打折
+
+		if (direction) {
+			points[0] = inverse;
+			points[1] = along;
+		} else {
+			points[0] = along;
+			points[1] = inverse;
+		}
+		return points;// 满分100
 	}
 
 	/**
@@ -110,26 +159,6 @@ public class StockTest2 {
 		double numeratorSum = list.get(list.size() - 1).mVolume_sum
 				- list.get(list.size() - 6).mVolume_sum;
 		return numeratorSum / 5;
-	}
-
-	public double getIndexPoint(List<IndexMinuteEntity> inputlist)
-			throws Exception {
-
-		if (inputlist.size() <= 15) {
-			return 10.0;
-		}
-
-		List<IndexMinuteEntity> list = getSubList(inputlist,
-				inputlist.size() - 15, inputlist.size() - 1);
-
-		// 判断方向
-		boolean direction = list.get(list.size() - 1).mIndex_now
-				- list.get(0).mIndex_now > 0;// true为↑
-		double weight1 = getIndexPointWeightFor1(list)[1] * 40 / 100;// 39.6
-		double weight2 = getIndexPointWeightFor3(list)[1] * 30 / 100;// 30
-		double weight3 = getIndexPointWeightFor15(list)[1] * 30 / 100;
-		double indexPoint = weight1 + weight2 + weight3;
-		return indexPoint;// 满分100
 	}
 
 	public double[] getIndexPointWeightFor1(List<IndexMinuteEntity> inputlist) {

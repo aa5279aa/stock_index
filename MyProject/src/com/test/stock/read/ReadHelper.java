@@ -25,13 +25,13 @@ public class ReadHelper {
 
 		for (int i = 0; i < lows.length; i++) {
 			String[] line = lows[i].split(",");
-			if (line.length == 3) {
+			if (line.length == 4) {
 				String[] times = new String[2];
 				times[0] = line[0].substring(0, line[0].indexOf(":"));
 				times[1] = line[0].substring(line[0].indexOf(":") + 1,
 						line[0].length());
 				String[] volums = line[1].split(":");
-				String[] indexs = line[2].split(":");
+				String[] indexs = line[3].split(":");
 				indexMinute = new IndexMinuteEntity(
 						IndexMinuteEntity.Board_SH_Main);
 				indexMinute.mId = i;

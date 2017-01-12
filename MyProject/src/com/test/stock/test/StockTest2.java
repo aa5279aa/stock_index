@@ -3,7 +3,9 @@ package com.test.stock.test;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.test.stock.config.IndexConfig;
 import com.test.stock.entity.IndexMinuteEntity;
+import com.test.stock.entity.StockActionEntity;
 import com.test.stock.read.ReadHelper;
 import com.test.stock.util.FormatUtil;
 
@@ -22,6 +24,8 @@ public class StockTest2 {
 	public static double holdMoney = 700000;// 持有金额
 	public static int holdSum = 200;// 持有股票
 	public static double stockValue = 0;// 市值
+	
+	List<StockActionEntity> actionList=new ArrayList<>();
 
 	public static void main(String[] args) {
 		try {
@@ -31,31 +35,66 @@ public class StockTest2 {
 		}
 	}
 
-	public void action100Stock(double index_now, int num) {
+	public void action100Stock(IndexMinuteEntity indexMinuteEntity, int num) {
+		// 操作记录，避免5分钟内同向操作
 		if (num == 0) {
 			return;
 		}
 		if (num > 0) {
-			double spendMoney = index_now * num;
+			if(actionList.size()>0){
+				StockActionEntity stockActionEntity = actionList.get(actionList.size()-1);
+				if (stockActionEntity.actionDirection
+						&& (indexMinuteEntity.mTime - stockActionEntity.time) < IndexConfig.SameDirectionInterval * 60 * 1000) {
+					System.out.println("避免5分钟内同向买入操作");
+					return;
+				}
+			}
+			
+			double spendMoney = indexMinuteEntity.mIndex_now * num;
 			if (spendMoney > holdMoney) {
 				System.out.println("所剩余额不足，不能买入");
 				return;
 			}
 			holdMoney -= spendMoney;
 			holdSum += num;
-			System.out.println("买入成功，买入" + num + "股，" + "花费" + spendMoney
-					+ "，剩余金额" + holdMoney + "，持有股票数量" + holdSum);
+			System.out.println("买入成功，买入" + num + "股，" + "花费" + FormatUtil.formatDouble2(spendMoney)
+					+ "，剩余金额" + FormatUtil.formatDouble2(holdMoney) + "，持有股票数量" + holdSum);
+
+			StockActionEntity actionEntity = new StockActionEntity();
+			actionEntity.actionDirection = true;
+			actionEntity.index_now = indexMinuteEntity.mIndex_now;
+			actionEntity.buyNum = num;
+			actionEntity.timeStr = indexMinuteEntity.mTimeStr;
+			actionEntity.time = indexMinuteEntity.mTime;
+			actionEntity.dateStr = indexMinuteEntity.mDateStr;
+			actionList.add(actionEntity);
 		} else {
 			num = num * -1;
+			if (actionList.size() > 0) {
+				StockActionEntity stockActionEntity = actionList.get(actionList
+						.size() - 1);
+				if (!stockActionEntity.actionDirection
+						&& (indexMinuteEntity.mTime - stockActionEntity.time) < IndexConfig.SameDirectionInterval * 60 * 1000) {
+					System.out.println("避免5分钟内同向卖出操作");
+					return;
+				}
+			}
 			if (num > holdSum) {
 				System.out.println("所剩股票数量不足，不能卖出");
 				return;
 			}
-			double incomeMoney = index_now * num;
+			double incomeMoney = indexMinuteEntity.mIndex_now * num;
 			holdMoney += incomeMoney;
 			holdSum -= num;
-			System.out.println("卖出成功，卖出" + num + "股，" + "收入" + incomeMoney
-					+ "，剩余金额" + holdMoney + "，持有股票数量" + holdSum);
+			System.out.println("卖出成功，卖出" + num + "股，" + "收入" + FormatUtil.formatDouble2(incomeMoney)
+					+ "，剩余金额" + FormatUtil.formatDouble2(holdMoney) + "，持有股票数量" + holdSum);
+			StockActionEntity actionEntity = new StockActionEntity();
+			actionEntity.actionDirection = true;
+			actionEntity.index_now = indexMinuteEntity.mIndex_now;
+			actionEntity.buyNum = num;
+			actionEntity.timeStr = indexMinuteEntity.mTimeStr;
+			actionEntity.dateStr = indexMinuteEntity.mDateStr;
+			actionList.add(actionEntity);
 		}
 	}
 
@@ -98,7 +137,7 @@ public class StockTest2 {
 					+ FormatUtil.formatDouble2(buyScore) + "，卖分："
 					+ FormatUtil.formatDouble2(sellScore));
 			System.out.println("符合买入指标，尝试买入100股");
-			action100Stock(indexMinuteEntity.mIndex_now, 100);
+			action100Stock(indexMinuteEntity, 100);
 			System.out.println("目前市值：" + FormatUtil.formatDouble2(stockValue));
 		} else if (sellScore > bugAndSellScore) {
 
@@ -108,13 +147,15 @@ public class StockTest2 {
 					+ FormatUtil.formatDouble2(sellScore));
 
 			System.out.println("符合卖出指标，尝试卖出100股");
-			action100Stock(indexMinuteEntity.mIndex_now, -100);
+			action100Stock(indexMinuteEntity, -100);
 			System.out.println("目前市值：" + FormatUtil.formatDouble2(stockValue));
 		} else {
 //			System.out.println(indexMinuteEntity.mTimeStr + ",当前指数："
 //					+ indexMinuteEntity.mIndex_now + ",买分："
 //					+ FormatUtil.formatDouble2(buyScore) + "，卖分："
 //					+ FormatUtil.formatDouble2(sellScore) + "____不操作");
+			System.out.println("时间：" + indexMinuteEntity.mTimeStr + ",目前市值："
+					+ FormatUtil.formatDouble2(stockValue));
 		}
 		
 	}
@@ -138,19 +179,19 @@ public class StockTest2 {
 		List<IndexMinuteEntity> list = getSubList(inputlist,
 				inputlist.size() - 15, inputlist.size() - 1);
 
-		boolean direction = list.get(list.size() - 3).mIndex_now
-				- list.get(0).mIndex_now > 0;// true为向上，false为向下
+		boolean direction = list.get(list.size() - 1).mIndex_now
+				- list.get(list.size() - 5).mIndex_now > 0;// true为向上，false为向下
 
-		double weight1 = getIndexPointWeightFor1(list)[1] * 40 / 100;
-		double weight2 = getIndexPointWeightFor3(list)[1] * 30 / 100;
+		double weight1 = getIndexPointWeightFor1(list)[1] * 40 / 100;//
+		double weight2 = getIndexPointWeightFor5(list)[1] * 30 / 100;
 		double weight3 = getIndexPointWeightFor15(list)[1] * 30 / 100;
 
 		double along = weight1 + weight2 + weight3;// 逆势
 
 		weight1 = getIndexPointWeightFor1(list)[0] * 40 / 100;
-		weight2 = getIndexPointWeightFor3(list)[0] * 30 / 100;
+		weight2 = getIndexPointWeightFor5(list)[0] * 30 / 100;
 		weight3 = getIndexPointWeightFor15(list)[0] * 30 / 100;
-		double inverse = (weight1 + weight2 + weight3) * 0.8;// 顺势.顺势打折
+		double inverse = (weight1 + weight2 + weight3) * 0.6;// 顺势.顺势打折
 
 		if (direction) {
 			points[0] = inverse;
@@ -254,7 +295,7 @@ public class StockTest2 {
 		return trend;
 	}
 
-	public double[] getIndexPointWeightFor3(List<IndexMinuteEntity> inputlist) {
+	public double[] getIndexPointWeightFor5(List<IndexMinuteEntity> inputlist) {
 		double[] trend = new double[2];
 		int size = inputlist.size();
 		IndexMinuteEntity now = inputlist.get(size - 1);
@@ -266,13 +307,13 @@ public class StockTest2 {
 		double gap3 = last2.mIndex_now - last3.mIndex_now;
 		double gap2 = last1.mIndex_now - last2.mIndex_now;
 		double gap1 = now.mIndex_now - last1.mIndex_now;
-
+		//这里需要判断一下差别值大小，差别值较小的话分值较低
 		if (!((gap1 > 0 && gap2 > 0 && gap3 > 0) || (gap1 < 0 && gap2 < 0 && gap3 < 0))) {
 			// 如果反转，则判断gap3的绝对值是否足够小
 			if (Math.abs(gap1) < 1) {
-				trend[1] = 100;
+				trend[1] = 80;
 			} else if (Math.abs(gap1) < 2) {
-				trend[1] = 50;
+				trend[1] = 40;
 			}
 			return trend;
 		}
@@ -282,11 +323,41 @@ public class StockTest2 {
 		double abs2 = Math.abs(gap2);
 		double abs3 = Math.abs(gap3);
 		if (abs1 > abs2 && abs2 > abs3) {
-			trend[0] = 100;
+			trend[0] = 0;
+			if (abs1 > 5) {
+				trend[0] += 30;
+			}
+			if (abs2 > 3) {
+				trend[0] += 30;
+			}
+			if (abs3 > 1) {
+				trend[0] += 40;
+			}
 		}
 		// 逆势 趋势变小
 		if (abs1 < abs2 && abs2 < abs3) {
 			trend[1] = 100;
+			trend[1] = 0;
+			if (abs1 < 1) {
+				trend[1] += 30;
+			}
+			if (abs2 < 3) {
+				trend[1] += 30;
+			}
+			if (abs3 < 5) {
+				trend[1] += 40;
+			}
+		}
+		
+		//逆势5分钟内必须要有有效指数变化，否则分值打折
+		double d = now.mIndex_now - inputlist.get(size - 6).mIndex_now;
+		double abs = Math.abs(d);
+		if(abs<1){
+			trend[1] *= 0.4;
+		}else if(abs<2){
+			trend[1] *= 0.6;
+		}else if(abs<4){
+			trend[1] *= 0.8;
 		}
 		return trend;
 	}
@@ -323,11 +394,26 @@ public class StockTest2 {
 		trend[1] = trend[1] > 100 ? 100 : trend[1];
 		trend[1] = trend[1] < 20 ? 20 : trend[1];
 
+		// 绝对值判断，如果幅度低了则分值低
+		if (Math.abs(gap5) < 5) {
+			trend[1] *= 0.4;
+		} else if (Math.abs(gap5) < 10) {
+			trend[1] *= 0.6;
+		} else if (Math.abs(gap5) < 20) {
+			trend[1] *= 0.8;
+		}
+
 		times = gap5 / gap10;
 		trend[0] = (times - 0.5) * 40 + 20;
 		trend[0] = trend[0] > 100 ? 100 : trend[0];
 		trend[0] = trend[0] < 20 ? 20 : trend[0];
-
+		if (Math.abs(gap10) < 5) {
+			trend[0] *= 0.4;
+		} else if (Math.abs(gap10) < 10) {
+			trend[0] *= 0.6;
+		} else if (Math.abs(gap10) < 20) {
+			trend[0] *= 0.8;
+		}
 		return trend;
 	}
 
